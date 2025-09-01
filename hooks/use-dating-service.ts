@@ -20,6 +20,7 @@ import { getClusterOffset, logNetworkInfo, getCurrentNetwork } from '@/lib/arciu
 import { FrontendProfile } from '@/lib/profile-utils';
 import { useToast } from './use-toast';
 import { useDatingEvents, DatingEvent, LikeEvent, MatchEvent } from '@/lib/dating-events';
+import { useTransactionNotifications } from '@/components/transaction-toast';
 
 export interface DatingServiceState {
   isInitialized: boolean;
@@ -78,6 +79,7 @@ export function useDatingService(): UseDatingServiceReturn {
   const { connected, sendTransaction } = useWallet();
   const { toast } = useToast();
   const eventManager = useDatingEvents();
+  const txNotifications = useTransactionNotifications();
   
   const [state, setState] = useState<DatingServiceState>({
     isInitialized: false,
@@ -348,9 +350,26 @@ export function useDatingService(): UseDatingServiceReturn {
         session.sessionId.toString(),
         publicKey.toString(),
         targetPublicKey.toString(),
-        '', // TX signature will be available in the service
+        '', // TX signature will be updated later
         Date.now()
       );
+
+              // Mark as completed with 5-second delay for MPC confirmation
+        setTimeout(() => {
+          eventManager.updateTransactionStatus(
+            sessionEvent.id,
+            session.txSignature || 'session_creation_tx',
+            true,
+            'completed'
+          );
+
+          // Show transaction notification for 5 seconds
+          txNotifications.showTransactionSuccess(
+            'session_created',
+            session.txSignature || 'session_creation_tx',
+            `Match session created with ${targetProfile.name}`
+          );
+        }, 5000); // Wait 5 seconds for MPC confirmation
 
       setState(prev => ({
         ...prev,
@@ -422,27 +441,62 @@ export function useDatingService(): UseDatingServiceReturn {
 
       const targetPublicKey = new PublicKey(targetProfile.walletAddress || targetProfile.id);
       
-      // Use wallet adapter for signing (no need for keypair generation)
-      if (!connected || !sendTransaction) {
-        throw new Error('Wallet not connected or does not support transaction signing');
+      // Handle unlike locally without blockchain submission
+      if (!isLike) {
+        // Unlike is handled locally - no need for onchain transaction
+        const likeEvent = eventManager.handleLikeSubmitted(
+          session.sessionId.toString(),
+          publicKey.toString(),
+          targetPublicKey.toString(),
+          false,
+          targetProfile.name,
+          '' // No transaction for unlike
+        );
+
+        toast({
+          title: "Unlike sent",
+          description: `Removed like for ${targetProfile.name}`,
+        });
+      } else {
+        // Only submit likes to blockchain
+        if (!connected || !sendTransaction) {
+          throw new Error('Wallet not connected or does not support transaction signing');
+        }
+
+        const result = await datingServiceRef.current.submitLikeWithWallet(
+          session.sessionPDA,
+          publicKey,
+          targetPublicKey,
+          true
+        );
+
+        // Handle like submission event
+        const likeEvent = eventManager.handleLikeSubmitted(
+          session.sessionId.toString(),
+          publicKey.toString(),
+          targetPublicKey.toString(),
+          true,
+          targetProfile.name,
+          result.txSignature
+        );
+
+        // Mark as completed and show notification (delayed by 5 seconds for MPC confirmation)
+        setTimeout(() => {
+          eventManager.updateTransactionStatus(
+            likeEvent.id,
+            result.txSignature,
+            true,
+            'completed'
+          );
+
+          // Show transaction notification for 5 seconds
+          txNotifications.showTransactionSuccess(
+            'like_submitted',
+            result.txSignature,
+            `Like sent to ${targetProfile.name}`
+          );
+        }, 5000); // Wait 5 seconds for MPC confirmation
       }
-
-      await datingServiceRef.current.submitLikeWithWallet(
-        session.sessionPDA,
-        publicKey,
-        targetPublicKey,
-        isLike
-      );
-
-      // Handle like submission event
-      const likeEvent = eventManager.handleLikeSubmitted(
-        session.sessionId.toString(),
-        publicKey.toString(),
-        targetPublicKey.toString(),
-        isLike,
-        targetProfile.name,
-        '' // TX signature will be available
-      );
 
       // Check for mutual interest
       const mutualInterestCheck = eventManager.checkMutualInterest(session.sessionId.toString());

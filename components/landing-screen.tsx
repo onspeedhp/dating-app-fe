@@ -28,7 +28,7 @@ export function LandingScreen({
               <Heart className='w-8 h-8 text-primary-foreground fill-current' />
             </div>
           </div>
-          <h1 className='text-4xl font-bold text-foreground mb-2'>Violet</h1>
+          <h1 className='text-4xl font-bold text-foreground mb-2'>Encrypted Match</h1>
           <p className='text-lg text-muted-foreground max-w-sm'>
             Find meaningful connections with people who share your interests
           </p>
@@ -66,7 +66,7 @@ export function LandingScreen({
               <div className='flex items-center justify-between mb-4'>
                 <div className='w-2 h-2 bg-primary rounded-full'></div>
                 <div className='text-xs font-medium text-muted-foreground'>
-                  Violet
+                  Encrypted Match
                 </div>
                 <div className='w-2 h-2 bg-accent rounded-full'></div>
               </div>

@@ -109,7 +109,7 @@ export function MainApp({
         {/* Mobile Header */}
         <div className='lg:hidden flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-background via-card/80 to-primary/5 backdrop-blur-sm'>
           <h1 className='text-xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent'>
-            Violet
+            Encrypted Match
           </h1>
           <div className='w-8 h-8 rounded-full bg-gradient-to-br from-primary via-accent to-primary flex items-center justify-center shadow-lg'>
             <User className='w-4 h-4 text-white' />

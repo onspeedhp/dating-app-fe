@@ -327,7 +327,7 @@ export function ProfileTab({
       <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Log out of Violet?</DialogTitle>
+            <DialogTitle>Log out of Encrypted Match?</DialogTitle>
             <DialogDescription>
               You'll need to log back in to access your account and continue
               matching.

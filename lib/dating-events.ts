@@ -13,6 +13,8 @@ export interface DatingEvent {
   data?: any;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   txSignature?: string;
+  txConfirmed?: boolean;
+  txTimestamp?: number;
 }
 
 export interface LikeEvent extends DatingEvent {
@@ -337,6 +339,44 @@ export class DatingEventsManager {
   }
 
   /**
+   * Update transaction status for an event
+   */
+  updateTransactionStatus(
+    eventId: string, 
+    txSignature: string, 
+    confirmed: boolean = false,
+    status?: 'pending' | 'processing' | 'completed' | 'failed'
+  ): void {
+    const eventIndex = this.events.findIndex(event => event.id === eventId);
+    if (eventIndex !== -1) {
+      this.events[eventIndex].txSignature = txSignature;
+      this.events[eventIndex].txConfirmed = confirmed;
+      this.events[eventIndex].txTimestamp = Date.now();
+      if (status) {
+        this.events[eventIndex].status = status;
+      }
+      this.saveToStorage();
+    }
+  }
+
+  /**
+   * Get events with transaction signatures
+   */
+  getEventsWithTransactions(): DatingEvent[] {
+    return this.events.filter(event => event.txSignature);
+  }
+
+  /**
+   * Get recent transactions for display
+   */
+  getRecentTransactions(limit: number = 10): DatingEvent[] {
+    return this.events
+      .filter(event => event.txSignature)
+      .sort((a, b) => (b.txTimestamp || b.timestamp) - (a.txTimestamp || a.timestamp))
+      .slice(0, limit);
+  }
+
+  /**
    * Clear all events (for testing/debugging)
    */
   clearAllEvents() {
@@ -391,5 +431,9 @@ export const useDatingEvents = () => {
     getMatchesForUser: datingEvents.getMatchesForUser.bind(datingEvents),
     getStats: datingEvents.getStats.bind(datingEvents),
     clearAllEvents: datingEvents.clearAllEvents.bind(datingEvents),
+    // Transaction methods
+    updateTransactionStatus: datingEvents.updateTransactionStatus.bind(datingEvents),
+    getEventsWithTransactions: datingEvents.getEventsWithTransactions.bind(datingEvents),
+    getRecentTransactions: datingEvents.getRecentTransactions.bind(datingEvents),
   };
 };

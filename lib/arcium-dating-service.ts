@@ -35,6 +35,7 @@ export interface MatchSession {
   matchFound: boolean;
   createdAt: Date;
   lastUpdated: Date;
+  txSignature?: string;
 }
 
 export interface LikeAction {
@@ -433,7 +434,8 @@ export class ArciumDatingService {
         isFinalized: false,
         matchFound: false,
         createdAt: new Date(),
-        lastUpdated: new Date()
+        lastUpdated: new Date(),
+        txSignature
       };
     } catch (error) {
       console.error("❌ Failed to create match session:", error);
@@ -556,7 +558,7 @@ export class ArciumDatingService {
     userId: PublicKey,
     targetId: PublicKey,
     isLike: boolean
-  ): Promise<void> {
+  ): Promise<{ txSignature: string }> {
     if (!this.mxePublicKey) {
       throw new Error("MXE public key not available. Initialize MPC environment first.");
     }
@@ -642,6 +644,8 @@ export class ArciumDatingService {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       console.log(`✅ ${isLike ? "Like" : "Unlike"} submitted successfully`);
+      
+      return { txSignature };
     } catch (error) {
       console.error(`❌ Failed to submit ${isLike ? "like" : "unlike"}:`, error);
       throw error;

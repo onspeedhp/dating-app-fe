@@ -182,7 +182,7 @@ export function AuthScreen({
           <ArrowLeft className='w-5 h-5' />
         </Button>
         <h1 className='text-lg font-semibold'>
-          Welcome to Violet
+          Welcome to Encrypted Match
         </h1>
         <div className='w-10' />
       </div>
@@ -195,7 +195,7 @@ export function AuthScreen({
               Secure Authentication
             </CardTitle>
             <CardDescription>
-              Connect your wallet to get started with Violet
+              Connect your wallet to get started with Encrypted Match
             </CardDescription>
           </CardHeader>
           <CardContent>

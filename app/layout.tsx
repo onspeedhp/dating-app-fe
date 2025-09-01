@@ -8,8 +8,8 @@ import { Suspense } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Violet - Find Your Match',
-  description: 'Modern dating app for meaningful connections',
+  title: 'Encrypted Match',
+  description: 'Encrypted match app for meaningful connections',
   generator: 'v0.app',
 };
 

@@ -39,6 +39,8 @@ export function SwipeCard({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+  const [showActionHint, setShowActionHint] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleStart = (clientX: number, clientY: number) => {
@@ -69,6 +71,35 @@ export function SwipeCard({
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
   };
+
+  // Enhanced desktop interactions
+  useEffect(() => {
+    if (isTop && !disabled) {
+      const timer = setTimeout(() => setShowActionHint(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isTop, disabled]);
+
+  // Keyboard navigation for desktop
+  useEffect(() => {
+    if (!isTop || disabled || isProcessing) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        onSwipe('left');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        onSwipe('right');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        onSuperLike?.();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTop, disabled, isProcessing, onSwipe, onSuperLike]);
 
   // Mouse events
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -127,8 +158,10 @@ export function SwipeCard({
       ref={cardRef}
       className={cn(
         'absolute top-0 left-0 w-full h-full cursor-grab active:cursor-grabbing overflow-hidden border-0 !p-0 !m-0',
-        isDragging && 'transition-none',
-        !isDragging && 'transition-all duration-400 ease-out'
+        'hover:shadow-2xl hover:scale-[1.02] transition-all duration-300',
+        isDragging && 'transition-none !shadow-2xl',
+        !isDragging && 'transition-all duration-400 ease-out',
+        isTop && 'ring-2 ring-primary/20'
       )}
       style={{
         transform: `translate(${dragOffset.x}px, ${
@@ -141,6 +174,8 @@ export function SwipeCard({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <CardContent className='!p-0 h-full w-full'>
         <div className='relative h-full w-full'>
@@ -305,6 +340,23 @@ export function SwipeCard({
               </button>
             </div>
           </div>
+
+          {/* Desktop Action Hints */}
+          {isTop && !disabled && (isHovered || showActionHint) && (
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center transition-all duration-300">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg p-4 text-center max-w-xs">
+                <p className="text-sm font-medium text-gray-800 mb-2">
+                  Desktop Controls
+                </p>
+                <div className="space-y-1 text-xs text-gray-600">
+                  <div>← Left Arrow: Pass</div>
+                  <div>→ Right Arrow: Like</div>
+                  <div>↑ Up Arrow: Super Like</div>
+                  <div className="text-gray-500 mt-2">Or drag to swipe</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

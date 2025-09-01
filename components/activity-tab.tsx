@@ -11,11 +11,14 @@ import {
   MessageCircle,
   Sparkles,
   RefreshCw,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { useContract } from '@/hooks/use-contract';
 import { useDatingService } from '@/hooks/use-dating-service';
 import { FrontendProfile, transformOnChainProfilesToFrontend } from '@/lib/profile-utils';
+import { useDatingEvents } from '@/lib/dating-events';
+import { TransactionToast } from '@/components/transaction-toast';
 
 interface ActivityTabProps {
   user: any;
@@ -25,7 +28,7 @@ export function ActivityTab({ user }: ActivityTabProps) {
   const [onchainProfiles, setOnchainProfiles] = useState<FrontendProfile[]>([]);
   const [likedProfiles, setLikedProfiles] = useState<FrontendProfile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
-  const [activeSection, setActiveSection] = useState<'profiles' | 'activity' | 'waiting'>('profiles');
+  const [activeSection, setActiveSection] = useState<'profiles' | 'activity' | 'waiting' | 'transactions'>('profiles');
 
   const { getActiveProfiles, isConnected } = useContract();
   const { 
@@ -34,6 +37,10 @@ export function ActivityTab({ user }: ActivityTabProps) {
     getLikesReceived, 
     getMatches 
   } = useDatingService();
+  
+  const { 
+    getRecentTransactions 
+  } = useDatingEvents();
 
   // Fetch onchain profiles
   useEffect(() => {
@@ -76,6 +83,7 @@ export function ActivityTab({ user }: ActivityTabProps) {
   const recentEvents = getRecentEvents();
   const matches = getMatches();
   const likesReceived = getLikesReceived();
+  const recentTransactions = getRecentTransactions(10);
 
   const refreshData = async () => {
     if (!isConnected) return;
@@ -113,6 +121,13 @@ export function ActivityTab({ user }: ActivityTabProps) {
       icon: MessageCircle, 
       count: recentEvents.length,
       color: 'text-purple-500'
+    },
+    { 
+      id: 'transactions' as const, 
+      label: 'Transactions', 
+      icon: ExternalLink, 
+      count: recentTransactions.length,
+      color: 'text-orange-500'
     },
   ];
 
@@ -366,7 +381,56 @@ export function ActivityTab({ user }: ActivityTabProps) {
             </CardContent>
           </Card>
         )}
+
+        {activeSection === 'transactions' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ExternalLink className="w-5 h-5 text-orange-500" />
+                Recent Transactions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentTransactions.length > 0 ? (
+                <div className="space-y-3">
+                  {recentTransactions.map((transaction, index) => (
+                    <div key={`activity-tx-${transaction.id}-${index}`}>
+                      <TransactionToast 
+                        transaction={{
+                          signature: transaction.txSignature || '',
+                          type: transaction.type as any,
+                          status: transaction.txConfirmed ? 'confirmed' : 'pending',
+                          timestamp: transaction.txTimestamp || transaction.timestamp,
+                          description: getTransactionDescription(transaction),
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <ExternalLink className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="font-medium text-muted-foreground">No transactions yet</p>
+                  <p className="text-sm text-muted-foreground">Your transaction history will appear here</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
+}
+
+function getTransactionDescription(event: any): string {
+  switch (event.type) {
+    case 'session_created':
+      return `Created match session with ${event.data?.targetProfile || 'user'}`;
+    case 'like_submitted':
+      return `${event.data?.isLike ? 'Liked' : 'Unliked'} ${event.data?.profileName || 'profile'}`;
+    case 'match_found':
+      return `Match found with ${event.data?.profileNames?.userA || 'user'}!`;
+    default:
+      return 'Dating app transaction';
+  }
 }
