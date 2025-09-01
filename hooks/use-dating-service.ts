@@ -113,7 +113,7 @@ export function useDatingService(): UseDatingServiceReturn {
   // Event handlers for blockchain events
   const eventHandlers: DatingServiceEvents = {
     onProfileCreated: useCallback((event: any) => {
-      console.log('📡 Profile created event:', event);
+      // Profile created event received
       const datingEvent = eventManager.addEvent({
         type: 'session_created', // We'll track this as a general event
         sessionId: `profile_${event.user}`,
@@ -135,17 +135,17 @@ export function useDatingService(): UseDatingServiceReturn {
     }, [toast, eventManager]),
 
     onMatchSessionCreated: useCallback((event: any) => {
-      console.log('📡 Match session created event:', event);
+      // Match session created event received
       // This will be handled in createMatchSession function
     }, []),
 
     onLikeSubmitted: useCallback((event: any) => {
-      console.log('📡 Like submitted event:', event);
+      // Like submitted event received
       // This will be handled in submitLike function
     }, []),
 
     onMutualInterestDetected: useCallback((event: any) => {
-      console.log('💕 Mutual interest detected event:', event);
+      // Mutual interest detected
       
       toast({
         title: "Mutual Interest! 💕",
@@ -154,7 +154,7 @@ export function useDatingService(): UseDatingServiceReturn {
     }, [toast]),
 
     onMutualMatchFound: useCallback((event: any) => {
-      console.log('🎉 Mutual match found event:', event);
+      // Mutual match found
       
       // Handle match found with event manager
       const matchEvent = eventManager.handleMatchFound(
@@ -177,7 +177,7 @@ export function useDatingService(): UseDatingServiceReturn {
     }, [toast, eventManager]),
 
     onNoMutualMatch: useCallback((event: any) => {
-      console.log('📝 No mutual match event:', event);
+      // No mutual match
       
       const noMatchEvent = eventManager.addEvent({
         type: 'no_match',
@@ -208,17 +208,16 @@ export function useDatingService(): UseDatingServiceReturn {
     if (savedKeypair) {
       try {
         const secretKey = JSON.parse(savedKeypair);
-        console.log('🔑 Using existing MXE owner keypair');
+        // Using existing MXE owner keypair
         return Keypair.fromSecretKey(new Uint8Array(secretKey));
       } catch (error) {
-        console.warn('Failed to load saved owner keypair:', error);
+        // Failed to load saved owner keypair
       }
     }
     
     // Generate new owner keypair for this dating app instance
     const ownerKeypair = Keypair.generate();
-    console.log('🔑 Generated new MXE owner keypair for dating app');
-    console.log(`   Owner address: ${ownerKeypair.publicKey.toString()}`);
+    // Generated new MXE owner keypair
     
     // Save for consistency across app sessions
     if (typeof window !== 'undefined') {
@@ -262,8 +261,7 @@ export function useDatingService(): UseDatingServiceReturn {
 
       // Log owner keypair info for debugging
       const ownerBalance = await provider.connection.getBalance(ownerKeypair.publicKey);
-      console.log(`💰 Owner keypair: ${ownerKeypair.publicKey.toString()}`);
-      console.log(`💰 Owner balance: ${ownerBalance / 1000000000} SOL`);
+      // Owner keypair configured
 
       // Initialize MPC environment with retry
       let retryCount = 0;
@@ -280,7 +278,7 @@ export function useDatingService(): UseDatingServiceReturn {
             throw initError; // Re-throw if all retries failed
           }
           
-          console.log(`🔄 MPC initialization failed, retry ${retryCount}/${maxRetries}`);
+          // MPC initialization retry
           await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
         }
       }
@@ -297,7 +295,7 @@ export function useDatingService(): UseDatingServiceReturn {
       });
 
     } catch (error) {
-      console.error('Failed to initialize dating service:', error);
+      // Failed to initialize dating service
       
       let errorMessage = 'Unknown error';
       let errorDescription = 'Could not initialize encrypted matching system';
@@ -360,10 +358,10 @@ export function useDatingService(): UseDatingServiceReturn {
         recentEvents: [sessionEvent, ...prev.recentEvents.slice(0, 9)]
       }));
 
-      console.log(`📱 Session created and tracked:`, sessionEvent);
+      // Session created and tracked
       return session;
     } catch (error) {
-      console.error('Failed to create match session:', error);
+      // Failed to create match session
       toast({
         title: "Session Creation Failed",
         description: "Could not create match session",
@@ -406,7 +404,7 @@ export function useDatingService(): UseDatingServiceReturn {
       });
 
       if (!session) {
-        console.log(`📝 Creating new match session for ${targetProfile.name}...`);
+        // Creating new match session
         const newSession = await createMatchSession(targetProfile);
         if (!newSession) {
           throw new Error('Failed to create match session');
@@ -419,7 +417,7 @@ export function useDatingService(): UseDatingServiceReturn {
           currentSessions: [...prev.currentSessions, newSession]
         }));
       } else {
-        console.log(`🔄 Using existing session ${session.sessionId} for ${targetProfile.name}`);
+        // Using existing session
       }
 
       const targetPublicKey = new PublicKey(targetProfile.walletAddress || targetProfile.id);
@@ -449,8 +447,7 @@ export function useDatingService(): UseDatingServiceReturn {
       // Check for mutual interest
       const mutualInterestCheck = eventManager.checkMutualInterest(session.sessionId.toString());
       
-      console.log(`💕 Like event tracked:`, likeEvent);
-      console.log(`🔍 Mutual interest check:`, mutualInterestCheck);
+      // Like event tracked and mutual interest checked
 
       // Update session state after successful like submission
       setState(prev => {
@@ -484,7 +481,7 @@ export function useDatingService(): UseDatingServiceReturn {
           targetProfile.name
         );
         
-        console.log(`🎉 Mutual match detected and tracked:`, matchEvent);
+        // Mutual match detected and tracked
         
         // Show match notification
         setTimeout(() => {
@@ -501,7 +498,7 @@ export function useDatingService(): UseDatingServiceReturn {
       });
 
     } catch (error) {
-      console.error(`Failed to submit ${isLike ? 'like' : 'unlike'}:`, error);
+      // Failed to submit like/unlike
       toast({
         title: "Action Failed",
         description: `Could not submit ${isLike ? 'like' : 'unlike'}`,
@@ -529,7 +526,7 @@ export function useDatingService(): UseDatingServiceReturn {
     }
 
     try {
-      console.log(`🔍 Checking mutual match for session ${sessionId}...`);
+      // Checking mutual match
       
       const sessionPDA = datingServiceRef.current.getSessionPDA(sessionId);
       const result = await datingServiceRef.current.checkMutualMatch(
@@ -537,7 +534,7 @@ export function useDatingService(): UseDatingServiceReturn {
         ownerKeypairRef.current
       );
 
-      console.log(`✅ Match check result:`, result);
+      // Match check completed
 
       // Update both matches and sessions state
       setState(prev => ({
@@ -561,12 +558,12 @@ export function useDatingService(): UseDatingServiceReturn {
           description: "You both liked each other! Start a conversation?",
         });
       } else {
-        console.log(`💭 No mutual match found for session ${sessionId}`);
+        // No mutual match found
       }
 
       return result;
     } catch (error) {
-      console.error('Failed to check mutual match:', error);
+      // Failed to check mutual match
       toast({
         title: "Match Check Failed",
         description: "Could not check for mutual match",
@@ -588,7 +585,7 @@ export function useDatingService(): UseDatingServiceReturn {
       const sessionPDA = datingServiceRef.current.getSessionPDA(sessionId);
       return await datingServiceRef.current.getMatchSession(sessionPDA);
     } catch (error) {
-      console.error('Failed to get match session:', error);
+      // Failed to get match session
       return null;
     }
   }, []);

@@ -95,7 +95,7 @@ export class DatingEventsManager {
         this.sessions = new Map(sessionsArray);
       }
     } catch (error) {
-      console.warn('Failed to load dating events from storage:', error);
+      // Failed to load events from storage
     }
   }
 
@@ -111,7 +111,7 @@ export class DatingEventsManager {
       localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(this.matches));
       localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(Array.from(this.sessions.entries())));
     } catch (error) {
-      console.warn('Failed to save dating events to storage:', error);
+      // Failed to save events to storage
     }
   }
 
@@ -135,7 +135,7 @@ export class DatingEventsManager {
     this.events.push(newEvent);
     this.saveToStorage();
 
-    console.log(`📅 Dating event added:`, newEvent);
+    // Event added successfully
     return newEvent;
   }
 
@@ -162,7 +162,7 @@ export class DatingEventsManager {
     this.sessions.set(sessionId, sessionEvent);
     this.saveToStorage();
 
-    console.log(`🔄 Session created:`, sessionEvent);
+    // Session created
     return sessionEvent;
   }
 
@@ -204,7 +204,7 @@ export class DatingEventsManager {
 
     this.saveToStorage();
 
-    console.log(`💕 Like ${isLike ? 'submitted' : 'withdrawn'}:`, likeEvent);
+    // Like action processed
     return likeEvent;
   }
 
@@ -242,7 +242,7 @@ export class DatingEventsManager {
     this.matches.push(matchEvent);
     this.saveToStorage();
 
-    console.log(`🎉 Match found:`, matchEvent);
+    // Match found
     return matchEvent;
   }
 
@@ -345,7 +345,7 @@ export class DatingEventsManager {
     this.matches = [];
     this.sessions.clear();
     this.saveToStorage();
-    console.log('🧹 All dating events cleared');
+    // All events cleared
   }
 
   /**
