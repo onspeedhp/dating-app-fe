@@ -21,7 +21,23 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { interestOptions } from '@/lib/mock-data';
+// Interest options for profile creation
+const interestOptions = [
+  'hiking', 'coffee', 'photography', 'travel', 'yoga', 'music', 'cooking',
+  'concerts', 'guitar', 'craft beer', 'art', 'painting', 'farmers markets',
+  'vintage shopping', 'indie films', 'rock climbing', 'camping', 'fitness',
+  'adventure sports', 'reading', 'dancing', 'wine tasting', 'board games',
+  'cycling', 'surfing', 'meditation', 'volunteering'
+];
+import { useContract } from '@/hooks/use-contract';
+import { 
+  generatePrivateProfileData, 
+  generateMatchingPreferences, 
+  convertProfileDataForBlockchain,
+  generateEncryptionKey,
+  validateProfileData 
+} from '@/lib/profile-utils';
+import { ProfileCreationStatus, ProfileCreationStep } from './profile-creation-status';
 
 interface OnboardingFlowProps {
   onComplete: (profileData: any) => void;
@@ -71,7 +87,11 @@ export function OnboardingFlow({ onComplete, user }: OnboardingFlowProps) {
     photos: [],
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [creationSteps, setCreationSteps] = useState<ProfileCreationStep[]>([]);
+  const [transactionSignature, setTransactionSignature] = useState<string>('');
   const { toast } = useToast();
+  const { createProfile, isConnected } = useContract();
 
   const updateProfileData = (updates: Partial<ProfileData>) => {
     setProfileData((prev) => ({ ...prev, ...updates }));
@@ -124,14 +144,168 @@ export function OnboardingFlow({ onComplete, user }: OnboardingFlowProps) {
     }
   };
 
-  const handleComplete = () => {
-    if (validateStep(currentStep)) {
-      toast({
-        title: 'Profile created!',
-        description: "Welcome to Violet. Let's find your perfect match!",
-      });
-      onComplete(profileData);
+  const updateCreationStep = (stepId: string, updates: Partial<ProfileCreationStep>) => {
+    setCreationSteps(prev => 
+      prev.map(step => 
+        step.id === stepId ? { ...step, ...updates } : step
+      )
+    );
+  };
+
+  const initializeCreationSteps = () => {
+    const steps: ProfileCreationStep[] = [
+      {
+        id: 'validation',
+        title: 'Validating Profile Data',
+        description: 'Checking profile information and requirements',
+        status: 'processing',
+      },
+      {
+        id: 'encryption',
+        title: 'Generating Encryption Keys',
+        description: 'Creating secure encryption for your private data',
+        status: 'pending',
+      },
+      {
+        id: 'blockchain',
+        title: 'Creating On-Chain Profile',
+        description: 'Submitting your profile to the blockchain',
+        status: 'pending',
+      },
+      {
+        id: 'confirmation',
+        title: 'Confirming Transaction',
+        description: 'Waiting for blockchain confirmation',
+        status: 'pending',
+      },
+    ];
+    setCreationSteps(steps);
+  };
+
+  const handleComplete = async () => {
+    if (!validateStep(currentStep)) {
+      return;
     }
+
+    // Check if wallet is connected
+    if (!isConnected) {
+      toast({
+        title: 'Wallet Required',
+        description: 'Please connect your wallet to create a profile.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreatingProfile(true);
+    initializeCreationSteps();
+
+    try {
+      // Step 1: Validate profile data
+      updateCreationStep('validation', { status: 'processing' });
+      
+      const validationErrors = validateProfileData(profileData);
+      if (validationErrors.length > 0) {
+        updateCreationStep('validation', { 
+          status: 'error', 
+          errorMessage: validationErrors[0] 
+        });
+        toast({
+          title: 'Validation Error',
+          description: validationErrors[0],
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      updateCreationStep('validation', { status: 'completed' });
+
+      // Step 2: Generate encryption keys
+      updateCreationStep('encryption', { status: 'processing' });
+      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UX
+
+      const encryptionKey = generateEncryptionKey();
+
+      // Generate private data and preferences
+      const privateData = generatePrivateProfileData(
+        profileData.name,
+        parseInt(profileData.age),
+        profileData.habits
+      );
+
+      const preferences = generateMatchingPreferences(
+        parseInt(profileData.age),
+        profileData.interests
+      );
+
+      // Convert to blockchain format
+      const blockchainData = convertProfileDataForBlockchain(
+        profileData,
+        privateData,
+        preferences,
+        encryptionKey
+      );
+
+      updateCreationStep('encryption', { status: 'completed' });
+
+      // Step 3: Create profile on blockchain
+      updateCreationStep('blockchain', { status: 'processing' });
+
+      const result = await createProfile(blockchainData);
+      
+      updateCreationStep('blockchain', { status: 'completed' });
+
+      // Step 4: Confirm transaction
+      updateCreationStep('confirmation', { status: 'processing' });
+      setTransactionSignature(result.signature);
+
+      // Small delay to show the confirmation step
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      updateCreationStep('confirmation', { status: 'completed' });
+
+      toast({
+        title: 'Profile Created Successfully!',
+        description: `Your profile has been created on-chain. Welcome to Violet!`,
+      });
+
+      // Store encryption key locally for future use
+      localStorage.setItem('profileEncryptionKey', Array.from(encryptionKey).join(','));
+
+      // Auto-complete after a brief delay
+      setTimeout(() => {
+        onComplete({
+          ...profileData,
+          signature: result.signature,
+          profilePDA: result.profilePDA.toBase58(),
+          encryptionKey: Array.from(encryptionKey),
+        });
+      }, 2000);
+
+    } catch (error: any) {
+      // Profile creation failed - error will be shown to user
+      
+      // Update the current processing step to error
+      const currentProcessingStep = creationSteps.find(step => step.status === 'processing');
+      if (currentProcessingStep) {
+        updateCreationStep(currentProcessingStep.id, { 
+          status: 'error', 
+          errorMessage: error.message || 'An unexpected error occurred' 
+        });
+      }
+
+      toast({
+        title: 'Profile Creation Failed',
+        description: error.message || 'Failed to create profile. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRetryCreation = () => {
+    setIsCreatingProfile(false);
+    setCreationSteps([]);
+    setTransactionSignature('');
   };
 
   const toggleInterest = (interest: string) => {
@@ -497,35 +671,73 @@ export function OnboardingFlow({ onComplete, user }: OnboardingFlowProps) {
         </div>
       </div>
 
+      {/* Wallet Connection Status */}
+      {!isConnected && (
+        <div className='px-6 py-2'>
+          <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800'>
+            <div className='flex items-center gap-2'>
+              <div className='w-2 h-2 bg-yellow-500 rounded-full'></div>
+              Please connect your wallet to create a profile on-chain
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className='flex-1 px-6 py-4'>
         <Card className='border-0 shadow-none'>
-          <CardContent className='p-6'>{renderStep()}</CardContent>
+          <CardContent className='p-6'>
+            {isCreatingProfile ? (
+              <ProfileCreationStatus
+                steps={creationSteps}
+                transactionSignature={transactionSignature}
+                onRetry={handleRetryCreation}
+                onComplete={() => {
+                  onComplete({
+                    ...profileData,
+                    signature: transactionSignature,
+                    encryptionKey: localStorage.getItem('profileEncryptionKey')?.split(',').map(Number),
+                  });
+                }}
+              />
+            ) : (
+              renderStep()
+            )}
+          </CardContent>
         </Card>
       </div>
 
       {/* Footer */}
-      <div className='p-6'>
-        {currentStep < STEPS.length ? (
-          <Button
-            onClick={handleNext}
-            size='lg'
-            className='w-full h-14 text-lg font-semibold rounded-2xl'
-          >
-            Continue
-            <ArrowRight className='w-5 h-5 ml-2' />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleComplete}
-            size='lg'
-            className='w-full h-14 text-lg font-semibold rounded-2xl'
-          >
-            Create Profile
-            <CheckCircle className='w-5 h-5 ml-2' />
-          </Button>
-        )}
-      </div>
+      {!isCreatingProfile && (
+        <div className='p-6'>
+          {currentStep < STEPS.length ? (
+            <Button
+              onClick={handleNext}
+              size='lg'
+              className='w-full h-14 text-lg font-semibold rounded-2xl'
+            >
+              Continue
+              <ArrowRight className='w-5 h-5 ml-2' />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleComplete}
+              size='lg'
+              className='w-full h-14 text-lg font-semibold rounded-2xl'
+              disabled={!isConnected}
+            >
+              {!isConnected ? (
+                'Connect Wallet First'
+              ) : (
+                <>
+                  Create Profile
+                  <CheckCircle className='w-5 h-5 ml-2' />
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

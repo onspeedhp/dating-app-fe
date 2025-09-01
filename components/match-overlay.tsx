@@ -3,10 +3,10 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Heart, MessageCircle, X } from 'lucide-react';
-import type { Profile } from '@/lib/mock-data';
+import type { FrontendProfile } from '@/lib/profile-utils';
 
 interface MatchOverlayProps {
-  profile: Profile;
+  profile: FrontendProfile;
   onClose: () => void;
 }
 

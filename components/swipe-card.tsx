@@ -6,11 +6,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Briefcase, GraduationCap } from 'lucide-react';
-import type { Profile } from '@/lib/mock-data';
+import type { FrontendProfile } from '@/lib/profile-utils';
 import { cn } from '@/lib/utils';
 
 interface SwipeCardProps {
-  profile: Profile;
+  profile: FrontendProfile;
   onSwipe: (direction: 'left' | 'right') => void;
   onPass?: () => void;
   onLike?: () => void;
@@ -20,6 +20,7 @@ interface SwipeCardProps {
   scale: number;
   translateY: number;
   disabled: boolean;
+  isProcessing?: boolean;
 }
 
 export function SwipeCard({
@@ -33,6 +34,7 @@ export function SwipeCard({
   scale,
   translateY,
   disabled,
+  isProcessing = false,
 }: SwipeCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -40,13 +42,13 @@ export function SwipeCard({
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleStart = (clientX: number, clientY: number) => {
-    if (!isTop || disabled) return;
+    if (!isTop || disabled || isProcessing) return;
     setIsDragging(true);
     setStartPos({ x: clientX, y: clientY });
   };
 
   const handleMove = (clientX: number, clientY: number) => {
-    if (!isDragging || !isTop || disabled) return;
+    if (!isDragging || !isTop || disabled || isProcessing) return;
 
     const deltaX = clientX - startPos.x;
     const deltaY = clientY - startPos.y;
@@ -55,7 +57,7 @@ export function SwipeCard({
   };
 
   const handleEnd = () => {
-    if (!isDragging || !isTop || disabled) return;
+    if (!isDragging || !isTop || disabled || isProcessing) return;
 
     const threshold = 100;
     const { x } = dragOffset;
@@ -199,6 +201,19 @@ export function SwipeCard({
             )}
           </div>
 
+                      {/* Processing Overlay */}
+          {isProcessing && (
+            <div className='absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-50'>
+              <div className='flex flex-col items-center gap-3 text-center px-4'>
+                <div className='w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
+                <div className='text-white text-sm font-medium space-y-1'>
+                  <p>🔒 Encrypting your action...</p>
+                  <p className='text-xs opacity-80'>Using MPC encryption for privacy</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Profile Info */}
           <div className='absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent'>
             {/* Basic Info */}
@@ -232,40 +247,58 @@ export function SwipeCard({
             {/* Action Buttons */}
             <div className='flex items-center justify-center gap-4'>
               <button
-                className='w-16 h-16 rounded-full border-2 border-red-500/60 hover:border-red-500 bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-all duration-200'
+                className={cn(
+                  'w-16 h-16 rounded-full border-2 border-red-500/60 hover:border-red-500 bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-all duration-200',
+                  isProcessing && 'opacity-50 cursor-not-allowed'
+                )}
+                disabled={isProcessing}
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Trigger swipe left animation with red overlay
-                  setDragOffset({ x: -200, y: 0 });
-                  // Keep the red overlay visible for a moment
-                  setTimeout(() => {
-                    onPass?.();
-                  }, 500);
+                  if (!isProcessing) {
+                    // Trigger swipe left animation with red overlay
+                    setDragOffset({ x: -200, y: 0 });
+                    // Keep the red overlay visible for a moment
+                    setTimeout(() => {
+                      onPass?.();
+                    }, 500);
+                  }
                 }}
               >
                 <span className='text-red-500 text-3xl font-bold'>×</span>
               </button>
 
               <button
-                className='w-14 h-14 rounded-full border-2 border-blue-500/60 hover:border-blue-500 bg-blue-500/20 hover:bg-blue-500/30 flex items-center justify-center transition-all duration-200'
+                className={cn(
+                  'w-14 h-14 rounded-full border-2 border-blue-500/60 hover:border-blue-500 bg-blue-500/20 hover:bg-blue-500/30 flex items-center justify-center transition-all duration-200',
+                  isProcessing && 'opacity-50 cursor-not-allowed'
+                )}
+                disabled={isProcessing}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSuperLike?.();
+                  if (!isProcessing) {
+                    onSuperLike?.();
+                  }
                 }}
               >
                 <span className='text-blue-500 text-2xl'>⭐</span>
               </button>
 
               <button
-                className='w-16 h-16 rounded-full border-2 border-green-500/60 hover:border-green-500 bg-green-500/20 hover:bg-green-500/30 flex items-center justify-center transition-all duration-200'
+                className={cn(
+                  'w-16 h-16 rounded-full border-2 border-green-500/60 hover:border-green-500 bg-green-500/20 hover:bg-green-500/30 flex items-center justify-center transition-all duration-200',
+                  isProcessing && 'opacity-50 cursor-not-allowed'
+                )}
+                disabled={isProcessing}
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Trigger swipe right animation with green overlay
-                  setDragOffset({ x: 200, y: 0 });
-                  // Keep the green overlay visible for a moment
-                  setTimeout(() => {
-                    onLike?.();
-                  }, 500);
+                  if (!isProcessing) {
+                    // Trigger swipe right animation with green overlay
+                    setDragOffset({ x: 200, y: 0 });
+                    // Keep the green overlay visible for a moment
+                    setTimeout(() => {
+                      onLike?.();
+                    }, 500);
+                  }
                 }}
               >
                 <span className='text-green-500 text-3xl'>♥</span>
