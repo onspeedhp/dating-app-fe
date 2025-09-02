@@ -207,7 +207,18 @@ export function DiscoverTab({ user }: DiscoverTabProps) {
   };
 
   const handleButtonAction = (action: 'pass' | 'like' | 'superlike') => {
-    if (!currentProfile || isAnimating) return;
+    console.log('Button action triggered:', action, { currentProfile: currentProfile?.name, isAnimating, datingState });
+    
+    if (!currentProfile || isAnimating) {
+      console.log('Action blocked:', { noProfile: !currentProfile, isAnimating });
+      return;
+    }
+
+    // Show immediate feedback
+    toast({
+      title: `${action === 'like' ? '💕' : action === 'pass' ? '👋' : '⭐'} ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+      description: `Processing ${action} for ${currentProfile.name}...`,
+    });
 
     switch (action) {
       case 'pass':
@@ -217,7 +228,8 @@ export function DiscoverTab({ user }: DiscoverTabProps) {
         handleSwipe('right', currentProfile);
         break;
       case 'superlike':
-        // Super like action - no toast notification for now
+        // Super like action - could implement special logic here
+        handleSwipe('right', currentProfile); // For now, treat as regular like
         break;
     }
   };

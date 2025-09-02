@@ -103,6 +103,11 @@ export function SwipeCard({
 
   // Mouse events
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't start drag if clicking on buttons
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
     e.preventDefault();
     handleStart(e.clientX, e.clientY);
   };
@@ -117,6 +122,11 @@ export function SwipeCard({
 
   // Touch events
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Don't start drag if touching buttons
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
     const touch = e.touches[0];
     handleStart(touch.clientX, touch.clientY);
   };
@@ -280,63 +290,68 @@ export function SwipeCard({
             </div>
 
             {/* Action Buttons */}
-            <div className='flex items-center justify-center gap-4'>
+            <div className='flex items-center justify-center gap-4 relative z-10'>
               <button
                 className={cn(
-                  'w-16 h-16 rounded-full border-2 border-red-500/60 hover:border-red-500 bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-all duration-200',
-                  isProcessing && 'opacity-50 cursor-not-allowed'
+                  'w-16 h-16 rounded-full border-2 border-red-500/60 hover:border-red-500 bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95',
+                  (isProcessing || disabled) && 'opacity-50 cursor-not-allowed',
+                  !isProcessing && !disabled && 'cursor-pointer hover:shadow-lg'
                 )}
-                disabled={isProcessing}
+                disabled={isProcessing || disabled}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  if (!isProcessing) {
-                    // Trigger swipe left animation with red overlay
-                    setDragOffset({ x: -200, y: 0 });
-                    // Keep the red overlay visible for a moment
-                    setTimeout(() => {
-                      onPass?.();
-                    }, 500);
+                  console.log('Pass button clicked!'); // Debug log
+                  if (!isProcessing && !disabled && isTop) {
+                    onPass?.();
                   }
                 }}
               >
-                <span className='text-red-500 text-3xl font-bold'>×</span>
+                <span className='text-red-500 text-3xl font-bold pointer-events-none'>×</span>
               </button>
 
               <button
                 className={cn(
-                  'w-14 h-14 rounded-full border-2 border-blue-500/60 hover:border-blue-500 bg-blue-500/20 hover:bg-blue-500/30 flex items-center justify-center transition-all duration-200',
-                  isProcessing && 'opacity-50 cursor-not-allowed'
+                  'w-14 h-14 rounded-full border-2 border-blue-500/60 hover:border-blue-500 bg-blue-500/20 hover:bg-blue-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95',
+                  (isProcessing || disabled) && 'opacity-50 cursor-not-allowed',
+                  !isProcessing && !disabled && 'cursor-pointer hover:shadow-lg'
                 )}
-                disabled={isProcessing}
+                disabled={isProcessing || disabled}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  if (!isProcessing) {
+                  console.log('Super like button clicked!'); // Debug log
+                  if (!isProcessing && !disabled && isTop) {
                     onSuperLike?.();
                   }
                 }}
               >
-                <span className='text-blue-500 text-2xl'>⭐</span>
+                <span className='text-blue-500 text-2xl pointer-events-none'>⭐</span>
               </button>
 
               <button
                 className={cn(
-                  'w-16 h-16 rounded-full border-2 border-green-500/60 hover:border-green-500 bg-green-500/20 hover:bg-green-500/30 flex items-center justify-center transition-all duration-200',
-                  isProcessing && 'opacity-50 cursor-not-allowed'
+                  'w-16 h-16 rounded-full border-2 border-green-500/60 hover:border-green-500 bg-green-500/20 hover:bg-green-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95',
+                  (isProcessing || disabled) && 'opacity-50 cursor-not-allowed',
+                  !isProcessing && !disabled && 'cursor-pointer hover:shadow-lg'
                 )}
-                disabled={isProcessing}
+                disabled={isProcessing || disabled}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  if (!isProcessing) {
-                    // Trigger swipe right animation with green overlay
-                    setDragOffset({ x: 200, y: 0 });
-                    // Keep the green overlay visible for a moment
-                    setTimeout(() => {
-                      onLike?.();
-                    }, 500);
+                  console.log('Like button clicked!'); // Debug log
+                  if (!isProcessing && !disabled && isTop) {
+                    onLike?.();
                   }
                 }}
               >
-                <span className='text-green-500 text-3xl'>♥</span>
+                <span className='text-green-500 text-3xl pointer-events-none'>♥</span>
               </button>
             </div>
           </div>
