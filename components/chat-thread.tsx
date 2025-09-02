@@ -5,8 +5,14 @@ import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Send, MoreVertical } from 'lucide-react';
+
+import {
+  ArrowLeft,
+  Send,
+  MoreVertical,
+  Camera,
+  Smile,
+} from 'lucide-react';
 import type { Chat, Profile } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 
@@ -24,10 +30,7 @@ export function ChatThread({
   onSendMessage,
 }: ChatThreadProps) {
   const [newMessage, setNewMessage] = useState('');
-  const [showInput, setShowInput] = useState(true);
-  const [lastScrollTop, setLastScrollTop] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
@@ -38,42 +41,15 @@ export function ChatThread({
     scrollToBottom();
   }, [chat.messages]);
 
-  // Handle scroll detection for smart input visibility
-  useEffect(() => {
-    const messagesContainer = messagesContainerRef.current;
-    if (!messagesContainer) return;
-
-    const handleScroll = () => {
-      const scrollTop = messagesContainer.scrollTop;
-      const scrollHeight = messagesContainer.scrollHeight;
-      const clientHeight = messagesContainer.clientHeight;
-      
-      // Check if scrolling up or down
-      const isScrollingUp = scrollTop < lastScrollTop;
-      const isScrollingDown = scrollTop > lastScrollTop;
-      
-      // Check if near bottom (within 100px)
-      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
-      
-      if (isScrollingUp && !isNearBottom) {
-        setShowInput(false);
-      } else if (isScrollingDown || isNearBottom) {
-        setShowInput(true);
-      }
-      
-      setLastScrollTop(scrollTop);
-    };
-
-    messagesContainer.addEventListener('scroll', handleScroll);
-    return () => messagesContainer.removeEventListener('scroll', handleScroll);
-  }, [lastScrollTop]);
-
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim()) {
       onSendMessage(newMessage.trim());
       setNewMessage('');
-      inputRef.current?.focus();
+      setTimeout(() => {
+        scrollToBottom();
+        inputRef.current?.focus();
+      }, 100);
     }
   };
 
@@ -157,11 +133,7 @@ export function ChatThread({
       </div>
 
       {/* Messages */}
-      <div 
-        ref={messagesContainerRef}
-        className='flex-1 overflow-y-auto p-4 space-y-4'
-        style={{ paddingBottom: showInput ? '80px' : '24px' }}
-      >
+      <div className='flex-1 overflow-y-auto p-4 space-y-4 pb-32'>
         {chat.messages.map((message, index) => {
           const isMe = message.senderId === 'me';
           const previousMessage = index > 0 ? chat.messages[index - 1] : null;
@@ -232,33 +204,63 @@ export function ChatThread({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input - Smart Sticky */}
-      <div 
-        className={cn(
-          'fixed bottom-20 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm z-40 transition-transform duration-300',
-          showInput ? 'translate-y-0' : 'translate-y-full'
-        )}
-      >
-        <div className='max-w-sm mx-auto'>
-          <form onSubmit={handleSend} className='flex gap-2'>
-            <Input
-              ref={inputRef}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder={`Message ${matchProfile.name}...`}
-              className='flex-1 h-12 rounded-2xl bg-muted border-0 focus-visible:ring-1 focus-visible:ring-ring'
-              maxLength={500}
-              onFocus={() => setShowInput(true)}
-            />
-            <Button
-              type='submit'
-              size='icon'
-              className='h-12 w-12 rounded-2xl'
-              disabled={!newMessage.trim()}
-            >
-              <Send className='w-5 h-5' />
-            </Button>
-          </form>
+      {/* Message Input - Always Visible */}
+      <div className='fixed bottom-20 left-0 right-0 p-2 border-t border-border bg-background/98 backdrop-blur-sm z-40'>
+        <div className='max-w-sm mx-auto px-2'>
+          <div className='flex items-end gap-2'>
+            {/* Action Buttons */}
+            <div className='flex gap-1'>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                onClick={() => {
+                  // Handle photo upload
+                }}
+              >
+                <Camera className='w-4 h-4' />
+              </Button>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                onClick={() => {
+                  // Handle emoji picker
+                }}
+              >
+                <Smile className='w-4 h-4' />
+              </Button>
+            </div>
+
+            {/* Message Input Container */}
+            <div className='flex-1 relative'>
+              <form onSubmit={handleSend} className='relative'>
+                <Input
+                  ref={inputRef}
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder={`Message ${matchProfile.name}...`}
+                  className='w-full h-10 rounded-3xl bg-muted border-0 focus-visible:ring-1 focus-visible:ring-ring pr-12 pl-4'
+                  maxLength={500}
+                />
+
+                {/* Send Button - Inside Input */}
+                <Button
+                  type='submit'
+                  size='icon'
+                  className={cn(
+                    'absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full transition-all duration-200',
+                    newMessage.trim()
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90 scale-100'
+                      : 'bg-transparent text-muted-foreground cursor-not-allowed scale-90'
+                  )}
+                  disabled={!newMessage.trim()}
+                >
+                  <Send className='w-3 h-3' />
+                </Button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     </div>

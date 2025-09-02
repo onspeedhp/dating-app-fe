@@ -5,7 +5,7 @@ import { SwipeCard } from '@/components/swipe-card';
 import { MatchOverlay } from '@/components/match-overlay';
 import { ProfileCardSkeleton } from '@/components/loading-skeleton';
 import { Button } from '@/components/ui/button';
-import { X, Heart, Star, RotateCcw } from 'lucide-react';
+import { Heart, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { mockProfiles, type Profile } from '@/lib/mock-data';
 

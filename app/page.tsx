@@ -10,7 +10,6 @@ import {
   getFakeUser,
   setFakeUser,
   removeFakeUser,
-  hasFakeUser,
 } from '@/lib/utils';
 import { fakeUser } from '@/lib/mock-data';
 

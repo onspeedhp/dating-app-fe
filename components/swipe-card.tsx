@@ -4,8 +4,7 @@ import type React from 'react';
 
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { MapPin, Briefcase, GraduationCap } from 'lucide-react';
+
 import type { Profile } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 
