@@ -85,7 +85,7 @@ export class ArciumDatingService {
     this.program = program;
     this.provider = provider;
     this.clusterOffset = clusterOffset; // Use provided cluster offset (always devnet)
-    this.clusterAccount = getClusterAccAddress(clusterOffset);
+    this.clusterAccount = new PublicKey("GgSqqAyH7AVY3Umcv8NvncrjFaNJuQLmxzxFxPoPW2Yd");
     this.eventCallbacks = eventCallbacks || {};
     this.initializeCompDefPDAs();
     this.setupEventListeners();
@@ -179,7 +179,7 @@ export class ArciumDatingService {
   /**
    * Initialize MPC environment and validate computation definitions
    */
-  async initializeMPCEnvironment(owner: Keypair): Promise<void> {
+  async initializeMPCEnvironment(): Promise<void> {
     try {
       // Get MXE public key
       this.mxePublicKey = await this.getMXEPublicKeyWithRetry();
@@ -298,8 +298,7 @@ export class ArciumDatingService {
    */
   async createMatchSession(
     userA: PublicKey,
-    userB: PublicKey,
-    owner: Keypair
+    userB: PublicKey
   ): Promise<MatchSession> {
     const sessionId = Date.now();
     const nonce = Date.now() + Math.floor(Math.random() * 1000);
@@ -307,7 +306,6 @@ export class ArciumDatingService {
     console.log(`🔄 Creating match session ${sessionId}:`, {
       userA: userA.toString().slice(0, 8) + '...',
       userB: userB.toString().slice(0, 8) + '...',
-      owner: owner.publicKey.toString().slice(0, 8) + '...',
       nonce
     });
     
@@ -357,7 +355,7 @@ export class ArciumDatingService {
       // Setup event listener for this session creation
       const sessionEventPromise = this.awaitEvent('matchSessionCreatedEvent');
       
-      // Create match session
+      // Create match session using wallet adapter (userA signs the transaction)
       const txSignature = await this.program.methods
         .initMatchSession(
           initMatchComputationOffset,
@@ -368,7 +366,7 @@ export class ArciumDatingService {
         )
         .accountsPartial({
           matchPairSession: matchSessionPDA,
-          payer: owner.publicKey,
+          payer: userA, // User A pays for session creation
           mxeAccount: mxeAccountPDA,
           mempoolAccount: mempoolPDA,
           executingPool: executingPoolPDA,
@@ -376,8 +374,7 @@ export class ArciumDatingService {
           compDefAccount: this.initMatchSessionCompDefPDA,
           clusterAccount: this.clusterAccount,
         })
-        .signers([owner])
-        .rpc();
+        .rpc(); // Uses provider's wallet for signing automatically
 
       console.log(`📝 Match session transaction: ${txSignature}`);
 
@@ -658,7 +655,7 @@ export class ArciumDatingService {
    */
   async checkMutualMatch(
     sessionPDA: PublicKey,
-    owner: Keypair
+    userPublicKey: PublicKey
   ): Promise<MatchResult> {
     try {
       const checkMatchComputationOffset = new anchor.BN(randomBytes(8));
@@ -679,12 +676,12 @@ export class ArciumDatingService {
         this.awaitEvent('noMutualMatchEvent')
       ]);
 
-      // Submit mutual match check
+      // Submit mutual match check using wallet adapter (user signs the transaction)
       const txSignature = await this.program.methods
         .checkMutualMatch(checkMatchComputationOffset)
         .accountsPartial({
           matchPairSession: sessionPDA,
-          payer: owner.publicKey,
+          payer: userPublicKey,
           mxeAccount: mxeAccountPDA,
           mempoolAccount: mempoolPDA,
           executingPool: executingPoolPDA,
@@ -692,8 +689,7 @@ export class ArciumDatingService {
           compDefAccount: this.checkMutualMatchCompDefPDA,
           clusterAccount: this.clusterAccount,
         })
-        .signers([owner])
-        .rpc();
+        .rpc(); // Uses provider's wallet for signing automatically
 
       console.log(`📝 Match check transaction: ${txSignature}`);
 
@@ -767,6 +763,93 @@ export class ArciumDatingService {
       this.program.programId
     );
     return sessionPDA;
+  }
+
+  /**
+   * Get all sessions for a specific user
+   */
+  async getUserSessions(userPublicKey: PublicKey): Promise<MatchSession[]> {
+    try {
+      console.log(`🔄 Loading sessions for user ${userPublicKey.toString().slice(0, 8)}...`);
+      
+      // Get all sessions where user is participant
+      const allSessions = await this.program.account.matchPairSession.all();
+      const userSessions = allSessions
+        .filter(accountInfo => {
+          const session = accountInfo.account;
+          return session.userA.toString() === userPublicKey.toString() || 
+                 session.userB.toString() === userPublicKey.toString();
+        })
+        .map(accountInfo => {
+          const session = accountInfo.account;
+          return {
+            sessionId: session.sessionId.toNumber(),
+            sessionPDA: accountInfo.publicKey,
+            userA: session.userA,
+            userB: session.userB,
+            isFinalized: session.isFinalized,
+            matchFound: session.matchFound,
+            createdAt: new Date(session.createdAt.toNumber() * 1000),
+            lastUpdated: new Date(session.lastUpdated.toNumber() * 1000)
+          };
+        });
+      
+      console.log(`✅ Found ${userSessions.length} sessions for user`);
+      return userSessions;
+    } catch (error) {
+      console.error("❌ Error loading user sessions:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Find existing session between two users by scanning blockchain
+   */
+  async findExistingSession(userA: PublicKey, userB: PublicKey): Promise<MatchSession | null> {
+    try {
+      console.log(`🔍 Searching for existing session between ${userA.toString().slice(0, 8)}... and ${userB.toString().slice(0, 8)}...`);
+      
+      // Get all MatchPairSession accounts from the program
+      const allSessions = await this.program.account.matchPairSession.all();
+      
+      console.log(`📊 Found ${allSessions.length} total sessions on blockchain`);
+      
+      // Find session where users match (either direction)
+      const matchingSession = allSessions.find(accountInfo => {
+        const session = accountInfo.account;
+        const sessionUserA = session.userA.toString();
+        const sessionUserB = session.userB.toString();
+        const targetUserA = userA.toString();
+        const targetUserB = userB.toString();
+        
+        return (
+          (sessionUserA === targetUserA && sessionUserB === targetUserB) ||
+          (sessionUserA === targetUserB && sessionUserB === targetUserA)
+        );
+      });
+      
+      if (matchingSession) {
+        const session = matchingSession.account;
+        console.log(`✅ Found existing session ${session.sessionId.toString()} between users`);
+        
+        return {
+          sessionId: session.sessionId.toNumber(),
+          sessionPDA: matchingSession.publicKey,
+          userA: session.userA,
+          userB: session.userB,
+          isFinalized: session.isFinalized,
+          matchFound: session.matchFound,
+          createdAt: new Date(session.createdAt.toNumber() * 1000),
+          lastUpdated: new Date(session.lastUpdated.toNumber() * 1000)
+        };
+      }
+      
+      console.log(`❌ No existing session found between users`);
+      return null;
+    } catch (error) {
+      console.error("❌ Error finding existing session:", error);
+      return null;
+    }
   }
 
   // Helper methods

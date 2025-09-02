@@ -16,10 +16,11 @@ import {
   buildFinalizeCompDefTx,
   getMXEAccAddress,
   getClusterAccAddress,
+  getArciumEnv,
 } from "@arcium-hq/client";
 
 // DEVNET CONFIGURATION
-const RPC_URL = "https://api.devnet.solana.com";
+const RPC_URL = "http://localhost:8899";
 const CLUSTER_OFFSET = 1116522165;
 
 // Utility function to read keypair from JSON file
@@ -76,7 +77,7 @@ async function initializeComputationDefinitions() {
     console.log(`📝 Program ID: ${programId.toString()}`);
     
     // Get cluster account
-    const clusterAccount = getClusterAccAddress(CLUSTER_OFFSET);
+    const clusterAccount = new PublicKey("GgSqqAyH7AVY3Umcv8NvncrjFaNJuQLmxzxFxPoPW2Yd");
     console.log(`🔗 Cluster account: ${clusterAccount.toString()}`);
     
     // Get MXE account

@@ -7,7 +7,7 @@ import { PublicKey } from '@solana/web3.js';
 
 // DEVNET CONFIGURATION - Always use devnet
 export const DEVNET_CLUSTER_OFFSET = 1116522165;
-export const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
+export const DEVNET_RPC_URL = 'http://localhost:8899';
 
 // Always return devnet
 export function getCurrentNetwork(): string {

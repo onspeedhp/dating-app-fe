@@ -94,7 +94,11 @@ export function useDatingService(): UseDatingServiceReturn {
   });
 
   const datingServiceRef = useRef<ArciumDatingService | null>(null);
-  const ownerKeypairRef = useRef<Keypair | null>(null);
+  const checkingMutualMatchRef = useRef<Set<number>>(new Set()); // Track sessions being checked
+  const processedEventsRef = useRef<Set<string>>(new Set()); // Track processed events to prevent duplicates
+  
+  // Static event handlers reference to prevent recreation
+  const eventHandlersRef = useRef<DatingServiceEvents | null>(null);
 
   // Load events from local storage on initialization
   useEffect(() => {
@@ -112,122 +116,94 @@ export function useDatingService(): UseDatingServiceReturn {
     }
   }, [publicKey]); // Remove eventManager from dependencies to prevent infinite loop
 
-  // Event handlers for blockchain events
+  // Event handlers for blockchain events - using regular object to avoid Rules of Hooks violation
   const eventHandlers: DatingServiceEvents = {
-    onProfileCreated: useCallback((event: any) => {
+    onProfileCreated: (event: any) => {
       // Profile created event received
-      const datingEvent = eventManager.addEvent({
-        type: 'session_created', // We'll track this as a general event
-        sessionId: `profile_${event.user}`,
-        userA: event.user.toString(),
-        userB: '',
-        status: 'completed',
-        data: event
-      });
-      
-      setState(prev => ({
-        ...prev,
-        recentEvents: [datingEvent, ...prev.recentEvents.slice(0, 9)]
-      }));
-      
-      toast({
-        title: "Profile Created",
-        description: `New profile created on-chain`,
-      });
-    }, [toast, eventManager]),
+      console.log(`👤 Profile created for user ${event.user?.toString()}`);
+      console.log('✅ Profile created successfully');
+    },
 
-    onMatchSessionCreated: useCallback((event: any) => {
+    onMatchSessionCreated: (event: any) => {
       // Match session created event received
-      // This will be handled in createMatchSession function
-    }, []),
+      console.log('📄 Match session created event received');
+    },
 
-    onLikeSubmitted: useCallback((event: any) => {
+    onLikeSubmitted: (event: any) => {
       // Like submitted event received
-      // This will be handled in submitLike function
-    }, []),
+      console.log('💕 Like submitted event received');
+    },
 
-    onMutualInterestDetected: useCallback((event: any) => {
-      // Mutual interest detected
+    onMutualInterestDetected: (event: any) => {
+      // Mutual interest detected from blockchain event
+      const sessionId = event.sessionId?.toString();
+      const eventKey = `mutual_interest_${sessionId}`;
       
-      toast({
-        title: "Mutual Interest! 💕",
-        description: "Both users liked each other",
-      });
-    }, [toast]),
+      // Prevent duplicate processing of same event
+      if (processedEventsRef.current.has(eventKey)) {
+        console.log(`⚠️ Duplicate onMutualInterestDetected event for session ${sessionId} - skipping`);
+        return;
+      }
+      
+      processedEventsRef.current.add(eventKey);
+      console.log(`💕 Mutual interest detected for session ${sessionId}`);
+      console.log('🎉 It\'s a Match! Both users liked each other! Checking final match...');
+      
+      // Auto-trigger final match check when receiving blockchain event
+      if (sessionId && publicKey && datingServiceRef.current) {
+        // Prevent duplicate calls for same session
+        if (checkingMutualMatchRef.current.has(parseInt(sessionId))) {
+          console.log(`⚠️ checkMutualMatch already in progress for session ${sessionId}`);
+          return;
+        }
 
-    onMutualMatchFound: useCallback((event: any) => {
-      // Mutual match found
-      
-      // Handle match found with event manager
-      const matchEvent = eventManager.handleMatchFound(
-        event.sessionId?.toString() || '',
-        event.userA?.toString() || '',
-        event.userB?.toString() || '',
-        'User A', // We'll get actual names later
-        'User B'
-      );
-      
-      setState(prev => ({
-        ...prev,
-        recentEvents: [matchEvent, ...prev.recentEvents.slice(0, 9)]
-      }));
-      
-      toast({
-        title: "It's a Match! 🎉",
-        description: "You both matched! Start a conversation?",
-      });
-    }, [toast, eventManager]),
+        setTimeout(async () => {
+          try {
+            checkingMutualMatchRef.current.add(parseInt(sessionId));
+            console.log(`🔍 Starting checkMutualMatch for session ${sessionId}`);
+            
+            // Call checkMutualMatch directly through service
+            const sessionPDA = datingServiceRef.current!.getSessionPDA(parseInt(sessionId));
+            const finalResult = await datingServiceRef.current!.checkMutualMatch(sessionPDA, publicKey);
+            
+            if (finalResult?.isMatch) {
+              console.log(`✅ Match confirmed for session ${sessionId}`);
+            }
+          } catch (error) {
+            console.error(`❌ checkMutualMatch failed for session ${sessionId}:`, error);
+          } finally {
+            checkingMutualMatchRef.current.delete(parseInt(sessionId));
+          }
+        }, 1500);
+      }
+    },
 
-    onNoMutualMatch: useCallback((event: any) => {
+    onMutualMatchFound: (event: any) => {
+      // Mutual match found - final confirmation from blockchain
+      const sessionId = event.sessionId?.toString() || '';
+      const eventKey = `match_found_${sessionId}`;
+      
+      // Prevent duplicate processing of same event
+      if (processedEventsRef.current.has(eventKey)) {
+        console.log(`⚠️ Duplicate onMutualMatchFound event for session ${sessionId} - skipping`);
+        return;
+      }
+      
+      processedEventsRef.current.add(eventKey);
+      console.log(`🎉 Mutual match found confirmed for session ${sessionId}`);
+      console.log('💕 Match Confirmed! You can now start chatting!');
+    },
+
+    onNoMutualMatch: (event: any) => {
       // No mutual match
+      const sessionId = event.sessionId?.toString() || '';
       
-      const noMatchEvent = eventManager.addEvent({
-        type: 'no_match',
-        sessionId: event.sessionId?.toString() || '',
-        userA: event.userA?.toString() || '',
-        userB: event.userB?.toString() || '',
-        status: 'completed',
-        data: event
-      });
-      
-      setState(prev => ({
-        ...prev,
-        recentEvents: [noMatchEvent, ...prev.recentEvents.slice(0, 9)]
-      }));
-    }, [eventManager]),
+      console.log(`❌ No mutual match for session ${sessionId}`);
+      console.log('❌ No mutual match confirmed');
+    },
   };
 
-  // Get MXE Owner Keypair (shared for entire dating app)
-  const getMXEOwnerKeypair = useCallback(async (): Promise<Keypair> => {
-    // In production, this should be loaded from secure environment
-    // For demo/testing, use a consistent keypair stored locally
-    
-    const DEMO_OWNER_KEY = 'dating_app_mxe_owner';
-    const savedKeypair = typeof window !== 'undefined' 
-      ? localStorage.getItem(DEMO_OWNER_KEY) 
-      : null;
-      
-    if (savedKeypair) {
-      try {
-        const secretKey = JSON.parse(savedKeypair);
-        // Using existing MXE owner keypair
-        return Keypair.fromSecretKey(new Uint8Array(secretKey));
-      } catch (error) {
-        // Failed to load saved owner keypair
-      }
-    }
-    
-    // Generate new owner keypair for this dating app instance
-    const ownerKeypair = Keypair.generate();
-    // Generated new MXE owner keypair
-    
-    // Save for consistency across app sessions
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(DEMO_OWNER_KEY, JSON.stringify(Array.from(ownerKeypair.secretKey)));
-    }
-    
-    return ownerKeypair;
-  }, []);
+
 
   // Initialize the dating service
   const initializeService = useCallback(async () => {
@@ -248,11 +224,6 @@ export function useDatingService(): UseDatingServiceReturn {
       const service = await createDatingService(program, provider, clusterOffset, eventHandlers);
       datingServiceRef.current = service;
 
-      // Get the MXE owner keypair (shared for all users of this dating app)
-      // In production, this should be the actual MXE operator's keypair
-      const ownerKeypair = await getMXEOwnerKeypair();
-      ownerKeypairRef.current = ownerKeypair;
-
       // Check SOL balance for user wallet
       const userBalance = await provider.connection.getBalance(publicKey);
       const minBalance = 0.1 * 1000000000; // 0.1 SOL minimum
@@ -261,17 +232,13 @@ export function useDatingService(): UseDatingServiceReturn {
         throw new Error('Insufficient SOL balance. Please ensure your wallet has at least 0.1 SOL for MPC operations.');
       }
 
-      // Log owner keypair info for debugging
-      const ownerBalance = await provider.connection.getBalance(ownerKeypair.publicKey);
-      // Owner keypair configured
-
       // Initialize MPC environment with retry
       let retryCount = 0;
       const maxRetries = 3;
       
       while (retryCount < maxRetries) {
         try {
-          await service.initializeMPCEnvironment(ownerKeypair);
+          await service.initializeMPCEnvironment();
           break; // Success, exit retry loop
         } catch (initError) {
           retryCount++;
@@ -290,6 +257,9 @@ export function useDatingService(): UseDatingServiceReturn {
         isInitialized: true,
         isInitializing: false
       }));
+
+      // Load existing sessions after initialization  
+      loadExistingSessions();
 
       toast({
         title: "Dating Service Ready",
@@ -326,14 +296,14 @@ export function useDatingService(): UseDatingServiceReturn {
         variant: "destructive"
       });
     }
-      }, [program, provider, publicKey, state.isInitialized, state.isInitializing, toast, eventHandlers, getMXEOwnerKeypair]);
+      }, [program, provider, publicKey, state.isInitialized, state.isInitializing, toast, eventHandlers]);
 
   // Create a match session with another user
   const createMatchSession = useCallback(async (
     targetProfile: FrontendProfile
   ): Promise<MatchSession | null> => {
-    if (!datingServiceRef.current || !ownerKeypairRef.current || !publicKey) {
-      throw new Error('Dating service not initialized');
+    if (!datingServiceRef.current || !publicKey) {
+      throw new Error('Dating service not initialized or wallet not connected');
     }
 
     try {
@@ -341,8 +311,7 @@ export function useDatingService(): UseDatingServiceReturn {
       
       const session = await datingServiceRef.current.createMatchSession(
         publicKey,
-        targetPublicKey,
-        ownerKeypairRef.current
+        targetPublicKey
       );
 
       // Handle session creation event
@@ -408,7 +377,7 @@ export function useDatingService(): UseDatingServiceReturn {
     }));
 
     try {
-      // Enhanced session finding logic - check by multiple criteria
+      // First check local state for performance
       let session = state.currentSessions.find(s => {
         const targetPubKey = targetProfile.walletAddress || targetProfile.id;
         const userAPubKey = s.userA.toString();
@@ -422,21 +391,42 @@ export function useDatingService(): UseDatingServiceReturn {
         );
       });
 
+      // If not found locally, query blockchain for existing session
       if (!session) {
-        // Creating new match session
-        const newSession = await createMatchSession(targetProfile);
-        if (!newSession) {
-          throw new Error('Failed to create match session');
-        }
-        session = newSession;
+        console.log(`🔍 No local session found, checking blockchain...`);
+        const targetPublicKey = new PublicKey(targetProfile.walletAddress || targetProfile.id);
         
-        // Update sessions state immediately
-        setState(prev => ({
-          ...prev,
-          currentSessions: [...prev.currentSessions, newSession]
-        }));
+        const existingSession = await datingServiceRef.current.findExistingSession(
+          publicKey,
+          targetPublicKey
+        );
+        
+        if (existingSession) {
+          console.log(`✅ Found existing session ${existingSession.sessionId} on blockchain`);
+          session = existingSession;
+          
+          // Add to local state for future use
+          setState(prev => ({
+            ...prev,
+            currentSessions: [...prev.currentSessions, existingSession]
+          }));
+        } else {
+          // No existing session found, create new one
+          console.log(`🆕 Creating new match session`);
+          const newSession = await createMatchSession(targetProfile);
+          if (!newSession) {
+            throw new Error('Failed to create match session');
+          }
+          session = newSession;
+          
+          // Update sessions state immediately
+          setState(prev => ({
+            ...prev,
+            currentSessions: [...prev.currentSessions, newSession]
+          }));
+        }
       } else {
-        // Using existing session
+        console.log(`✅ Using existing local session ${session.sessionId}`);
       }
 
       const targetPublicKey = new PublicKey(targetProfile.walletAddress || targetProfile.id);
@@ -523,28 +513,7 @@ export function useDatingService(): UseDatingServiceReturn {
         };
       });
 
-      // Check if this creates a mutual match
-      const finalMutualCheck = eventManager.checkMutualInterest(session.sessionId.toString());
-      if (finalMutualCheck.hasMutualInterest) {
-        // Create a match event
-        const matchEvent = eventManager.handleMatchFound(
-          session.sessionId.toString(),
-          publicKey.toString(),
-          targetPublicKey.toString(),
-          'You', // Current user
-          targetProfile.name
-        );
-        
-        // Mutual match detected and tracked
-        
-        // Show match notification
-        setTimeout(() => {
-          toast({
-            title: "It's a Match! 🎉",
-            description: `You and ${targetProfile.name} liked each other!`,
-          });
-        }, 1000);
-      }
+      // Local check removed - will rely on blockchain events for mutual interest detection
 
       toast({
         title: isLike ? "Like Sent! 💕" : "Unlike Sent",
@@ -575,8 +544,8 @@ export function useDatingService(): UseDatingServiceReturn {
   const checkMutualMatch = useCallback(async (
     sessionId: number
   ): Promise<MatchResult | null> => {
-    if (!datingServiceRef.current || !ownerKeypairRef.current) {
-      throw new Error('Dating service not initialized');
+    if (!datingServiceRef.current || !publicKey) {
+      throw new Error('Dating service not initialized or wallet not connected');
     }
 
     try {
@@ -585,7 +554,7 @@ export function useDatingService(): UseDatingServiceReturn {
       const sessionPDA = datingServiceRef.current.getSessionPDA(sessionId);
       const result = await datingServiceRef.current.checkMutualMatch(
         sessionPDA,
-        ownerKeypairRef.current
+        publicKey
       );
 
       // Match check completed
@@ -625,7 +594,7 @@ export function useDatingService(): UseDatingServiceReturn {
       });
       return null;
     }
-  }, [toast]);
+  }, [publicKey, toast]);
 
   // Get match session details
   const getMatchSession = useCallback(async (
@@ -697,6 +666,26 @@ export function useDatingService(): UseDatingServiceReturn {
   const getRecentEvents = useCallback(() => {
     return eventManager.getRecentEvents(10);
   }, [eventManager]);
+
+
+
+  // Load user's existing sessions from blockchain
+  const loadExistingSessions = useCallback(async () => {
+    if (!datingServiceRef.current || !publicKey) return;
+    
+    try {
+      const userSessions = await datingServiceRef.current.getUserSessions(publicKey);
+      
+      // Update state with existing sessions
+      setState(prev => ({
+        ...prev,
+        currentSessions: userSessions
+      }));
+      
+    } catch (error) {
+      console.error("❌ Failed to load existing sessions:", error);
+    }
+  }, [publicKey]);
 
   // Additional helper functions for the new event system
   const getPendingLikes = useCallback(() => {
