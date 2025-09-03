@@ -5,20 +5,29 @@ import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { ArrowLeft, Send, MoreVertical } from 'lucide-react';
+import type { FrontendProfile } from '@/lib/profile-utils';
 
-import {
-  ArrowLeft,
-  Send,
-  MoreVertical,
-  Camera,
-  Smile,
-} from 'lucide-react';
-import type { Chat, Profile } from '@/lib/mock-data';
+interface Chat {
+  id: string;
+  matchId: string;
+  messages: Message[];
+  lastMessage?: Message;
+  unreadCount: number;
+}
+
+interface Message {
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: Date;
+}
 import { cn } from '@/lib/utils';
 
 interface ChatThreadProps {
   chat: Chat;
-  matchProfile?: Profile;
+  matchProfile?: FrontendProfile | null;
   onBack: () => void;
   onSendMessage: (message: string) => void;
 }

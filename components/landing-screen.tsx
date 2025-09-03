@@ -2,27 +2,20 @@
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { WalletConnectButton } from '@/components/wallet-connect-button';
 import {
   Heart,
   Users,
   MessageCircle,
   Sparkles,
-  UserCheck,
-  UserX,
 } from 'lucide-react';
 
 interface LandingScreenProps {
-  onLogin: () => void;
-  onSignup: () => void;
-  onFakeUser: () => void;
-  hasFakeUser: boolean;
+  onGetStarted: () => void;
 }
 
 export function LandingScreen({
-  onLogin,
-  onSignup,
-  onFakeUser,
-  hasFakeUser,
+  onGetStarted,
 }: LandingScreenProps) {
   return (
     <div className='min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col'>
@@ -35,7 +28,7 @@ export function LandingScreen({
               <Heart className='w-8 h-8 text-primary-foreground fill-current' />
             </div>
           </div>
-          <h1 className='text-4xl font-bold text-foreground mb-2'>Violet</h1>
+          <h1 className='text-4xl font-bold text-foreground mb-2'>Encrypted Match</h1>
           <p className='text-lg text-muted-foreground max-w-sm'>
             Find meaningful connections with people who share your interests
           </p>
@@ -73,7 +66,7 @@ export function LandingScreen({
               <div className='flex items-center justify-between mb-4'>
                 <div className='w-2 h-2 bg-primary rounded-full'></div>
                 <div className='text-xs font-medium text-muted-foreground'>
-                  Violet
+                  Encrypted Match
                 </div>
                 <div className='w-2 h-2 bg-accent rounded-full'></div>
               </div>
@@ -99,41 +92,21 @@ export function LandingScreen({
 
       {/* Action Buttons */}
       <div className='px-6 pb-8 space-y-3'>
-        {/* Fake User Button for Testing */}
         <Button
-          onClick={onFakeUser}
-          variant='outline'
-          size='lg'
-          className='w-full h-12 text-sm font-medium rounded-2xl bg-secondary/50 border-dashed border-2 border-muted-foreground/30 hover:border-muted-foreground/50'
-        >
-          {hasFakeUser ? (
-            <>
-              <UserCheck className='w-4 h-4 mr-2 text-green-600' />
-              Fake User Active - Click to Disable
-            </>
-          ) : (
-            <>
-              <UserX className='w-4 h-4 mr-2 text-muted-foreground' />
-              🧪 Enable Fake User (Testing)
-            </>
-          )}
-        </Button>
-
-        <Button
-          onClick={onSignup}
+          onClick={onGetStarted}
           size='lg'
           className='w-full h-14 text-lg font-semibold rounded-2xl'
         >
-          Get Started
+          Connect Wallet & Get Started
         </Button>
-        <Button
-          onClick={onLogin}
-          variant='outline'
-          size='lg'
-          className='w-full h-14 text-lg font-semibold rounded-2xl bg-transparent'
-        >
-          I already have an account
-        </Button>
+        
+        <div className='text-center'>
+          <p className='text-xs text-muted-foreground'>
+            Secure authentication with your Solana wallet
+            <br />
+            No email or password required
+          </p>
+        </div>
       </div>
     </div>
   );

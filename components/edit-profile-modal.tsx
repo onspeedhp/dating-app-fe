@@ -16,7 +16,14 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { X } from 'lucide-react';
-import { interestOptions } from '@/lib/mock-data';
+// Interest options for profile editing
+const interestOptions = [
+  'hiking', 'coffee', 'photography', 'travel', 'yoga', 'music', 'cooking',
+  'concerts', 'guitar', 'craft beer', 'art', 'painting', 'farmers markets',
+  'vintage shopping', 'indie films', 'rock climbing', 'camping', 'fitness',
+  'adventure sports', 'reading', 'dancing', 'wine tasting', 'board games',
+  'cycling', 'surfing', 'meditation', 'volunteering'
+];
 
 interface EditProfileModalProps {
   open: boolean;

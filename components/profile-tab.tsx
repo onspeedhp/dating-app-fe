@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { EditProfileModal } from '@/components/edit-profile-modal';
 import { PhotoManagerModal } from '@/components/photo-manager-modal';
+import { WalletInfoCard } from '@/components/wallet-info-card';
 import {
   User,
   Edit3,
@@ -27,19 +28,16 @@ import {
   MapPin,
   Briefcase,
   GraduationCap,
-  UserCheck,
-  UserX,
 } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
 import { useToast } from '@/hooks/use-toast';
+
 
 interface ProfileTabProps {
   user: any;
   onLogout: () => void;
   onDeleteProfile: () => void;
   onUpdateProfile: (updates: any) => void;
-  onDisableFakeUser?: () => void;
-  hasFakeUser?: boolean;
 }
 
 export function ProfileTab({
@@ -47,19 +45,19 @@ export function ProfileTab({
   onLogout,
   onDeleteProfile,
   onUpdateProfile,
-  onDisableFakeUser,
-  hasFakeUser,
 }: ProfileTabProps) {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showPhotoManager, setShowPhotoManager] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
 
-  const handleThemeToggle = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
+
+  const handleThemeToggle = (checked: boolean) => {
+    const newTheme = checked ? 'dark' : 'light';
     setTheme(newTheme);
     toast({
       title: `Switched to ${newTheme} mode`,
@@ -91,6 +89,8 @@ export function ProfileTab({
     });
   };
 
+
+
   return (
     <div className='flex-1 overflow-y-auto'>
       {/* Header */}
@@ -113,11 +113,16 @@ export function ProfileTab({
               <div className='w-24 h-24 rounded-full overflow-hidden bg-muted mb-4 ring-2 ring-primary/20'>
                 <img
                   src={
-                    user.photos?.[0] ||
-                    '/placeholder.svg?height=96&width=96&query=profile photo'
+                    user?.photos?.[0] ||
+                    user?.profile?.avatarUrl ||
+                    (user?.name ? `https://api.dicebear.com/7.x/avatars/svg?seed=${encodeURIComponent(user.name)}` : '/placeholder.svg?height=96&width=96&query=profile photo')
                   }
                   alt='Profile'
                   className='w-full h-full object-cover'
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = user?.name ? `https://api.dicebear.com/7.x/avatars/svg?seed=${encodeURIComponent(user.name)}` : '/placeholder.svg?height=96&width=96';
+                  }}
                 />
               </div>
               
@@ -209,6 +214,15 @@ export function ProfileTab({
           </CardContent>
         </Card>
 
+        {/* Wallet Information */}
+        <WalletInfoCard className='border-0 bg-card/50' />
+
+
+
+
+
+
+
         {/* App Settings */}
         <Card className='border-0 bg-card/50'>
           <CardHeader>
@@ -263,32 +277,7 @@ export function ProfileTab({
               />
             </div>
 
-            {/* Fake User Setting */}
-            {onDisableFakeUser && (
-              <div className='flex items-center justify-between py-2 border-t pt-4'>
-                <div className='flex items-center gap-3'>
-                  {hasFakeUser ? (
-                    <UserCheck className='w-5 h-5 text-green-600' />
-                  ) : (
-                    <UserX className='w-5 h-5 text-muted-foreground' />
-                  )}
-                  <div>
-                    <p className='font-medium'>Testing Mode</p>
-                    <p className='text-sm text-muted-foreground'>
-                      {hasFakeUser ? 'Fake user active' : 'Fake user disabled'}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={onDisableFakeUser}
-                  className='text-xs'
-                >
-                  {hasFakeUser ? 'Disable' : 'Enable'}
-                </Button>
-              </div>
-            )}
+
           </CardContent>
         </Card>
 
@@ -330,7 +319,7 @@ export function ProfileTab({
       <PhotoManagerModal
         open={showPhotoManager}
         onClose={() => setShowPhotoManager(false)}
-        photos={user.photos || []}
+        photos={user?.photos || user?.profile?.avatarUrl ? [user.profile.avatarUrl] : []}
         onSave={(photos) => handleProfileUpdate({ photos })}
       />
 
@@ -338,7 +327,7 @@ export function ProfileTab({
       <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Log out of Violet?</DialogTitle>
+            <DialogTitle>Log out of Encrypted Match?</DialogTitle>
             <DialogDescription>
               You'll need to log back in to access your account and continue
               matching.

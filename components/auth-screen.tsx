@@ -2,10 +2,8 @@
 
 import type React from 'react';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Card,
   CardContent,
@@ -13,95 +11,162 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Wallet, Loader2, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { WalletConnectButton } from '@/components/wallet-connect-button';
+import { useWalletInfo } from '@/hooks/use-wallet';
+import { useContract } from '@/hooks/use-contract';
 
 interface AuthScreenProps {
-  mode: 'login' | 'signup';
   onSuccess: (userData: any) => void;
   onBack: () => void;
-  onSwitchMode: () => void;
 }
 
 export function AuthScreen({
-  mode,
   onSuccess,
   onBack,
-  onSwitchMode,
 }: AuthScreenProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-  }>({});
+  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
+  const [authStep, setAuthStep] = useState<'connect' | 'checking' | 'ready'>('connect');
   const { toast } = useToast();
+  const { walletInfo } = useWalletInfo();
+  const { hasProfile, getUserProfile } = useContract();
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validateForm = () => {
-    const newErrors: typeof errors = {};
-
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!validateEmail(email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    if (mode === 'signup') {
-      if (!confirmPassword) {
-        newErrors.confirmPassword = 'Please confirm your password';
-      } else if (password !== confirmPassword) {
-        newErrors.confirmPassword = "Passwords don't match";
+  // Check for profile when wallet connects
+  useEffect(() => {
+    const checkUserProfile = async () => {
+      if (!walletInfo.isConnected || !walletInfo.address) {
+        setAuthStep('connect');
+        return;
       }
+
+      setAuthStep('checking');
+      setIsCheckingProfile(true);
+
+      try {
+        // Check if user has a profile
+        const profileExists = await hasProfile();
+        
+        if (profileExists) {
+          // Get the profile data
+          const profileData = await getUserProfile();
+          
+          // User has profile, proceed to main app
+          const userData = {
+            id: walletInfo.address,
+            walletAddress: walletInfo.address,
+            name: profileData?.profile?.username || '',
+            onboardingComplete: true,
+            profile: profileData?.profile,
+          };
+
+          toast({
+            title: 'Welcome back!',
+            description: 'Successfully connected with existing profile.',
+          });
+
+          onSuccess(userData);
+        } else {
+          // No profile found, user needs to create one
+          const userData = {
+            id: walletInfo.address,
+            walletAddress: walletInfo.address,
+            name: '',
+            onboardingComplete: false,
+            profile: null,
+          };
+
+          setAuthStep('ready');
+          
+          toast({
+            title: 'Wallet Connected!',
+            description: 'Please create your profile to continue.',
+          });
+
+          onSuccess(userData);
+        }
+      } catch (error) {
+        // Profile check failed - will show appropriate UI
+        toast({
+          title: 'Error',
+          description: 'Failed to check profile. Please try again.',
+          variant: 'destructive',
+        });
+        setAuthStep('connect');
+      } finally {
+        setIsCheckingProfile(false);
+      }
+    };
+
+    checkUserProfile();
+  }, [walletInfo.isConnected, walletInfo.address, hasProfile, getUserProfile, onSuccess, toast]);
+
+  const renderContent = () => {
+    if (authStep === 'checking' || isCheckingProfile) {
+      return (
+        <div className='flex flex-col items-center justify-center space-y-6'>
+          <div className='relative'>
+            <div className='w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center'>
+              <Loader2 className='w-8 h-8 text-primary animate-spin' />
+            </div>
+          </div>
+          <div className='text-center space-y-2'>
+            <h3 className='text-lg font-semibold'>Checking Profile...</h3>
+            <p className='text-sm text-muted-foreground'>
+              We're verifying your account details
+            </p>
+          </div>
+        </div>
+      );
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    if (authStep === 'ready' && walletInfo.isConnected) {
+      return (
+        <div className='flex flex-col items-center justify-center space-y-6'>
+          <div className='relative'>
+            <div className='w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center'>
+              <CheckCircle className='w-8 h-8 text-green-600 dark:text-green-400' />
+            </div>
+          </div>
+          <div className='text-center space-y-2'>
+            <h3 className='text-lg font-semibold'>Wallet Connected!</h3>
+            <p className='text-sm text-muted-foreground'>
+              Redirecting to profile creation...
+            </p>
+          </div>
+        </div>
+      );
+    }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    return (
+      <div className='space-y-6'>
+        <div className='text-center space-y-4'>
+          <div className='w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto'>
+            <Wallet className='w-8 h-8 text-primary' />
+          </div>
+          <div>
+            <h3 className='text-lg font-semibold mb-2'>Connect Your Wallet</h3>
+            <p className='text-sm text-muted-foreground'>
+              Use your Solana wallet to sign in securely. No email or password required.
+            </p>
+          </div>
+        </div>
 
-    if (!validateForm()) return;
+        <WalletConnectButton
+          variant="default"
+          className="h-12 rounded-xl"
+          fullWidth
+        />
 
-    setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-
-      // Mock successful auth
-      const userData = {
-        id: 'user-1',
-        email,
-        name: '',
-        onboardingComplete: false,
-      };
-
-      toast({
-        title: mode === 'login' ? 'Welcome back!' : 'Account created!',
-        description:
-          mode === 'login'
-            ? "You've successfully logged in."
-            : "Let's set up your profile.",
-      });
-
-      onSuccess(userData);
-    }, 1500);
+        <div className='text-center'>
+          <p className='text-xs text-muted-foreground'>
+            Your wallet address will be used as your unique identifier.
+            <br />
+            We'll check if you have an existing profile automatically.
+          </p>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -117,187 +182,24 @@ export function AuthScreen({
           <ArrowLeft className='w-5 h-5' />
         </Button>
         <h1 className='text-lg font-semibold'>
-          {mode === 'login' ? 'Welcome back' : 'Create account'}
+          Welcome to Encrypted Match
         </h1>
         <div className='w-10' />
       </div>
 
-      {/* Form */}
+      {/* Content */}
       <div className='flex-1 flex items-center justify-center px-6'>
         <Card className='w-full max-w-sm border-0 shadow-none'>
           <CardHeader className='text-center pb-6'>
             <CardTitle className='text-2xl'>
-              {mode === 'login' ? 'Log in to Violet' : 'Join Violet'}
+              Secure Authentication
             </CardTitle>
             <CardDescription>
-              {mode === 'login'
-                ? 'Enter your credentials to access your account'
-                : 'Create your account to start meeting new people'}
+              Connect your wallet to get started with Encrypted Match
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className='space-y-4'>
-              {/* Email */}
-              <div className='space-y-2'>
-                <Label htmlFor='email'>Email</Label>
-                <div className='relative'>
-                  <Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground' />
-                  <Input
-                    id='email'
-                    type='email'
-                    placeholder='Enter your email'
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className='pl-10 h-12 rounded-xl'
-                    disabled={isLoading}
-                  />
-                </div>
-                {errors.email && (
-                  <p className='text-sm text-destructive'>{errors.email}</p>
-                )}
-              </div>
-
-              {/* Password */}
-              <div className='space-y-2'>
-                <Label htmlFor='password'>Password</Label>
-                <div className='relative'>
-                  <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground' />
-                  <Input
-                    id='password'
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder='Enter your password'
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className='pl-10 pr-10 h-12 rounded-xl'
-                    disabled={isLoading}
-                  />
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='icon'
-                    className='absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10'
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
-                  >
-                    {showPassword ? (
-                      <EyeOff className='w-4 h-4' />
-                    ) : (
-                      <Eye className='w-4 h-4' />
-                    )}
-                  </Button>
-                </div>
-                {errors.password && (
-                  <p className='text-sm text-destructive'>{errors.password}</p>
-                )}
-              </div>
-
-              {/* Confirm Password (Signup only) */}
-              {mode === 'signup' && (
-                <div className='space-y-2'>
-                  <Label htmlFor='confirmPassword'>Confirm Password</Label>
-                  <div className='relative'>
-                    <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground' />
-                    <Input
-                      id='confirmPassword'
-                      type='password'
-                      placeholder='Confirm your password'
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className='pl-10 h-12 rounded-xl'
-                      disabled={isLoading}
-                    />
-                  </div>
-                  {errors.confirmPassword && (
-                    <p className='text-sm text-destructive'>
-                      {errors.confirmPassword}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <Button
-                type='submit'
-                className='w-full h-12 text-lg font-semibold rounded-xl mt-6'
-                disabled={isLoading}
-              >
-                {isLoading
-                  ? 'Please wait...'
-                  : mode === 'login'
-                  ? 'Log In'
-                  : 'Create Account'}
-              </Button>
-
-              {/* Social Login Placeholders */}
-              <div className='relative my-6'>
-                <div className='absolute inset-0 flex items-center'>
-                  <span className='w-full border-t border-border' />
-                </div>
-                <div className='relative flex justify-center text-xs uppercase'>
-                  <span className='bg-background px-2 text-muted-foreground'>
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <div className='grid grid-cols-2 gap-3'>
-                <Button
-                  variant='outline'
-                  className='h-12 rounded-xl bg-transparent'
-                  disabled
-                >
-                  <svg className='w-5 h-5 mr-2' viewBox='0 0 24 24'>
-                    <path
-                      fill='currentColor'
-                      d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'
-                    />
-                    <path
-                      fill='currentColor'
-                      d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'
-                    />
-                    <path
-                      fill='currentColor'
-                      d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'
-                    />
-                    <path
-                      fill='currentColor'
-                      d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
-                    />
-                  </svg>
-                  Google
-                </Button>
-                <Button
-                  variant='outline'
-                  className='h-12 rounded-xl bg-transparent'
-                  disabled
-                >
-                  <svg
-                    className='w-5 h-5 mr-2'
-                    fill='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path d='M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z' />
-                  </svg>
-                  Facebook
-                </Button>
-              </div>
-
-              {/* Switch Mode */}
-              <div className='text-center mt-6'>
-                <p className='text-sm text-muted-foreground'>
-                  {mode === 'login'
-                    ? "Don't have an account?"
-                    : 'Already have an account?'}{' '}
-                  <Button
-                    variant='link'
-                    className='p-0 h-auto font-semibold text-primary'
-                    onClick={onSwitchMode}
-                  >
-                    {mode === 'login' ? 'Sign up' : 'Log in'}
-                  </Button>
-                </p>
-              </div>
-            </form>
+            {renderContent()}
           </CardContent>
         </Card>
       </div>

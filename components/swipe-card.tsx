@@ -4,12 +4,13 @@ import type React from 'react';
 
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-
-import type { Profile } from '@/lib/mock-data';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, Briefcase, GraduationCap } from 'lucide-react';
+import type { FrontendProfile } from '@/lib/profile-utils';
 import { cn } from '@/lib/utils';
 
 interface SwipeCardProps {
-  profile: Profile;
+  profile: FrontendProfile;
   onSwipe: (direction: 'left' | 'right') => void;
   onPass?: () => void;
   onLike?: () => void;
@@ -19,6 +20,7 @@ interface SwipeCardProps {
   scale: number;
   translateY: number;
   disabled: boolean;
+  isProcessing?: boolean;
 }
 
 export function SwipeCard({
@@ -32,20 +34,23 @@ export function SwipeCard({
   scale,
   translateY,
   disabled,
+  isProcessing = false,
 }: SwipeCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+  const [showActionHint, setShowActionHint] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleStart = (clientX: number, clientY: number) => {
-    if (!isTop || disabled) return;
+    if (!isTop || disabled || isProcessing) return;
     setIsDragging(true);
     setStartPos({ x: clientX, y: clientY });
   };
 
   const handleMove = (clientX: number, clientY: number) => {
-    if (!isDragging || !isTop || disabled) return;
+    if (!isDragging || !isTop || disabled || isProcessing) return;
 
     const deltaX = clientX - startPos.x;
     const deltaY = clientY - startPos.y;
@@ -54,7 +59,7 @@ export function SwipeCard({
   };
 
   const handleEnd = () => {
-    if (!isDragging || !isTop || disabled) return;
+    if (!isDragging || !isTop || disabled || isProcessing) return;
 
     const threshold = 100;
     const { x } = dragOffset;
@@ -67,8 +72,42 @@ export function SwipeCard({
     setDragOffset({ x: 0, y: 0 });
   };
 
+  // Enhanced desktop interactions
+  useEffect(() => {
+    if (isTop && !disabled) {
+      const timer = setTimeout(() => setShowActionHint(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isTop, disabled]);
+
+  // Keyboard navigation for desktop
+  useEffect(() => {
+    if (!isTop || disabled || isProcessing) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        onSwipe('left');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        onSwipe('right');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        onSuperLike?.();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTop, disabled, isProcessing, onSwipe, onSuperLike]);
+
   // Mouse events
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't start drag if clicking on buttons
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
     e.preventDefault();
     handleStart(e.clientX, e.clientY);
   };
@@ -83,6 +122,11 @@ export function SwipeCard({
 
   // Touch events
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Don't start drag if touching buttons
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
     const touch = e.touches[0];
     handleStart(touch.clientX, touch.clientY);
   };
@@ -124,8 +168,10 @@ export function SwipeCard({
       ref={cardRef}
       className={cn(
         'absolute top-0 left-0 w-full h-full cursor-grab active:cursor-grabbing overflow-hidden border-0 !p-0 !m-0',
-        isDragging && 'transition-none',
-        !isDragging && 'transition-all duration-400 ease-out'
+        'hover:shadow-2xl hover:scale-[1.02] transition-all duration-300',
+        isDragging && 'transition-none !shadow-2xl',
+        !isDragging && 'transition-all duration-400 ease-out',
+        isTop && 'ring-2 ring-primary/20'
       )}
       style={{
         transform: `translate(${dragOffset.x}px, ${
@@ -138,6 +184,8 @@ export function SwipeCard({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <CardContent className='!p-0 h-full w-full'>
         <div className='relative h-full w-full'>
@@ -198,6 +246,19 @@ export function SwipeCard({
             )}
           </div>
 
+                      {/* Processing Overlay */}
+          {isProcessing && (
+            <div className='absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-50'>
+              <div className='flex flex-col items-center gap-3 text-center px-4'>
+                <div className='w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin'></div>
+                <div className='text-white text-sm font-medium space-y-1'>
+                  <p>🔒 Encrypting your action...</p>
+                  <p className='text-xs opacity-80'>Using MPC encryption for privacy</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Profile Info */}
           <div className='absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent'>
             {/* Basic Info */}
@@ -229,48 +290,88 @@ export function SwipeCard({
             </div>
 
             {/* Action Buttons */}
-            <div className='flex items-center justify-center gap-4'>
+            <div className='flex items-center justify-center gap-4 relative z-10'>
               <button
-                className='w-16 h-16 rounded-full border-2 border-red-500/60 hover:border-red-500 bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-all duration-200'
+                className={cn(
+                  'w-16 h-16 rounded-full border-2 border-red-500/60 hover:border-red-500 bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95',
+                  (isProcessing || disabled) && 'opacity-50 cursor-not-allowed',
+                  !isProcessing && !disabled && 'cursor-pointer hover:shadow-lg'
+                )}
+                disabled={isProcessing || disabled}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  // Trigger swipe left animation with red overlay
-                  setDragOffset({ x: -200, y: 0 });
-                  // Keep the red overlay visible for a moment
-                  setTimeout(() => {
+                  console.log('Pass button clicked!'); // Debug log
+                  if (!isProcessing && !disabled && isTop) {
                     onPass?.();
-                  }, 500);
+                  }
                 }}
               >
-                <span className='text-red-500 text-3xl font-bold'>×</span>
+                <span className='text-red-500 text-3xl font-bold pointer-events-none'>×</span>
               </button>
 
               <button
-                className='w-14 h-14 rounded-full border-2 border-blue-500/60 hover:border-blue-500 bg-blue-500/20 hover:bg-blue-500/30 flex items-center justify-center transition-all duration-200'
+                className={cn(
+                  'w-14 h-14 rounded-full border-2 border-blue-500/60 hover:border-blue-500 bg-blue-500/20 hover:bg-blue-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95',
+                  (isProcessing || disabled) && 'opacity-50 cursor-not-allowed',
+                  !isProcessing && !disabled && 'cursor-pointer hover:shadow-lg'
+                )}
+                disabled={isProcessing || disabled}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  onSuperLike?.();
+                  console.log('Super like button clicked!'); // Debug log
+                  if (!isProcessing && !disabled && isTop) {
+                    onSuperLike?.();
+                  }
                 }}
               >
-                <span className='text-blue-500 text-2xl'>⭐</span>
+                <span className='text-blue-500 text-2xl pointer-events-none'>⭐</span>
               </button>
 
               <button
-                className='w-16 h-16 rounded-full border-2 border-green-500/60 hover:border-green-500 bg-green-500/20 hover:bg-green-500/30 flex items-center justify-center transition-all duration-200'
+                className={cn(
+                  'w-16 h-16 rounded-full border-2 border-green-500/60 hover:border-green-500 bg-green-500/20 hover:bg-green-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95',
+                  (isProcessing || disabled) && 'opacity-50 cursor-not-allowed',
+                  !isProcessing && !disabled && 'cursor-pointer hover:shadow-lg'
+                )}
+                disabled={isProcessing || disabled}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  // Trigger swipe right animation with green overlay
-                  setDragOffset({ x: 200, y: 0 });
-                  // Keep the green overlay visible for a moment
-                  setTimeout(() => {
+                  console.log('Like button clicked!'); // Debug log
+                  if (!isProcessing && !disabled && isTop) {
                     onLike?.();
-                  }, 500);
+                  }
                 }}
               >
-                <span className='text-green-500 text-3xl'>♥</span>
+                <span className='text-green-500 text-3xl pointer-events-none'>♥</span>
               </button>
             </div>
           </div>
+
+          {/* Desktop Action Hints */}
+          {isTop && !disabled && (isHovered || showActionHint) && (
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center transition-all duration-300">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg p-4 text-center max-w-xs">
+                <p className="text-sm font-medium text-gray-800 mb-2">
+                  Desktop Controls
+                </p>
+                <div className="space-y-1 text-xs text-gray-600">
+                  <div>← Left Arrow: Pass</div>
+                  <div>→ Right Arrow: Like</div>
+                  <div>↑ Up Arrow: Super Like</div>
+                  <div className="text-gray-500 mt-2">Or drag to swipe</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
