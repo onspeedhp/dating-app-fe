@@ -12,8 +12,8 @@ interface MatchOverlayProps {
 
 export function MatchOverlay({ profile, onClose }: MatchOverlayProps) {
   return (
-    <div className='fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-20 p-4'>
-      <Card className='w-full max-w-sm border-0 bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-sm mt-8'>
+    <div className='fixed top-0 left-0 right-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-20 p-4' style={{ height: 'calc(100vh - 100px)' }}>
+      <Card className='w-full max-w-sm border-0 bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-sm'>
         <CardContent className='p-8 text-center'>
           {/* Close Button */}
           <Button
